@@ -33,9 +33,9 @@ def keep_alive():
     Thread(target=lambda: _flask.run(host="0.0.0.0", port=port)).start()
 
 # -------------------- CONFIG --------------------
-TOKEN = os.getenv("")  # <-- set this in Render dashboard
-if not TOKEN:
-    raise RuntimeErro8208891679:AAE6j5aVkxE8SsAJyLnM_Uhy823qFSR7SoEr("BOT_TOKEN env var not set!")
+TOKEN = os.getenv("8208891679:AAE6j5aVkxE8SsAJyLnM_Uhy823qFSR7SoE")  # <-- set this in Render dashboard
+
+
 
 ADMIN_IDS = [5567349252]               # add more if needed
 
