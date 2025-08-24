@@ -1,5 +1,5 @@
-# Main.py
-# DailyEarnBot – Full features (PTB v20+ / SQLite / Render keep_alive)
+# main.py
+# DailyEarnBot – PTB v20+, SQLite, Render keep_alive
 
 import os
 import asyncio
@@ -12,22 +12,16 @@ from threading import Thread
 from flask import Flask
 from telegram import (
     Update,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    ReplyKeyboardMarkup,
-    KeyboardButton,
+    InlineKeyboardMarkup, InlineKeyboardButton,
+    ReplyKeyboardMarkup, KeyboardButton,
 )
 from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    ConversationHandler,
-    ContextTypes,
-    filters,
+    Application, CommandHandler, MessageHandler,
+    CallbackQueryHandler, ConversationHandler,
+    ContextTypes, filters,
 )
 
-# -------------------- KEEP-ALIVE (for Render) --------------------
+# -------------------- KEEP-ALIVE (Render) --------------------
 _flask = Flask("keep_alive")
 
 @_flask.route("/")
@@ -35,26 +29,24 @@ def _home():
     return "✅ Bot server is alive!"
 
 def keep_alive():
-    port = int(os.environ.get("PORT", 8080))  # Render provides PORT
+    port = int(os.environ.get("PORT", 8080))   # Render injects PORT
     Thread(target=lambda: _flask.run(host="0.0.0.0", port=port)).start()
 
-
 # -------------------- CONFIG --------------------
-TOKEN = os.getenv("8208891679:AAE6j5aVkxE8SsAJyLnM_Uhy823qFSR7SoE")
+TOKEN = os.getenv("BOT_TOKEN")  # <-- set this in Render dashboard
 if not TOKEN:
     raise RuntimeError("BOT_TOKEN env var not set!")
 
+ADMIN_IDS = [5567349252]               # add more if needed
 
-ADMIN_IDS = [5567349252]                           # Add more if needed
-
-GOAL_USERS = 10_000                                # Withdraw opens after this many users
-FIRST_N_CAN_WITHDRAW = 10_000                      # Only first N registered users eligible
+GOAL_USERS = 10_000
+FIRST_N_CAN_WITHDRAW = 10_000
 
 JOIN_BONUS_COINS = 25
 REFERRAL_BONUS_COINS = 25
 DAILY_BONUS_COINS = 5
 
-SLABS = [(1000, 10), (5000, 50), (10000, 100)]     # (coins → INR)
+SLABS = [(1000, 10), (5000, 50), (10000, 100)]  # (coins -> INR)
 
 TASKS = [
     ("👍 Join our updates channel", 10),
@@ -73,7 +65,6 @@ logging.basicConfig(
     level=logging.INFO,
 )
 log = logging.getLogger("DailyEarnBot")
-
 
 # -------------------- DB HELPERS --------------------
 def db() -> sqlite3.Connection:
@@ -109,7 +100,7 @@ def init_db():
               amount INTEGER,
               method TEXT,
               address TEXT,
-              status TEXT,           -- PENDING/APPROVED/REJECTED
+              status TEXT,
               created_at TEXT,
               decided_at TEXT,
               admin_id INTEGER
@@ -125,7 +116,7 @@ def init_db():
             );
             """
         )
-        # Seed tasks if empty
+        # seed tasks
         cur = c.execute("SELECT COUNT(*) AS n FROM tasks").fetchone()
         if cur["n"] == 0:
             c.executemany("INSERT INTO tasks(title, coins) VALUES(?,?)", TASKS)
@@ -139,7 +130,6 @@ def total_users(conn: sqlite3.Connection) -> int:
     return row["n"] if row else 0
 
 def eligible_to_withdraw(conn: sqlite3.Connection, user_id: int) -> Tuple[bool, str]:
-    """Enforces goal + first-N rule."""
     t = total_users(conn)
     if t < GOAL_USERS:
         return (
@@ -157,7 +147,6 @@ def eligible_to_withdraw(conn: sqlite3.Connection, user_id: int) -> Tuple[bool, 
 def add_coins(conn: sqlite3.Connection, user_id: int, amount: int):
     conn.execute("UPDATE users SET coins = coins + ? WHERE user_id=?", (amount, user_id))
     conn.commit()
-
 
 # -------------------- UI HELPERS --------------------
 def main_menu_kb() -> ReplyKeyboardMarkup:
@@ -190,13 +179,11 @@ def withdraw_method_kb() -> InlineKeyboardMarkup:
         ]
     )
 
-
 # -------------------- USER COMMANDS --------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     init_db()
     user = update.effective_user
     ref_id = None
-
     if context.args:
         try:
             ref_id = int(context.args[0])
@@ -213,10 +200,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 VALUES(?,?,?,?,?,?,?)
                 """,
                 (
-                    user.id,
-                    user.first_name or "",
-                    0,
-                    0,
+                    user.id, user.first_name or "", 0, 0,
                     datetime.utcnow().isoformat(),
                     ref_id if ref_id and ref_id != user.id else None,
                     idx,
@@ -224,10 +208,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             conn.commit()
 
-            # Joining bonus
             add_coins(conn, user.id, JOIN_BONUS_COINS)
 
-            # Referral bonus
             if ref_id and ref_id != user.id and get_user(conn, ref_id):
                 add_coins(conn, ref_id, REFERRAL_BONUS_COINS)
                 conn.execute("UPDATE users SET referrals = referrals + 1 WHERE user_id=?", (ref_id,))
@@ -324,7 +306,6 @@ async def tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 async def task_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # user sends: done <task_id>
     parts = (update.message.text or "").strip().split()
     if len(parts) != 2 or parts[0].lower() != "done":
         return
@@ -404,7 +385,6 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lines.append(f"{i}. {name} – {r['referrals']} refs")
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
-
 # -------------------- WITHDRAW FLOW --------------------
 async def withdraw_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     with db() as conn:
@@ -483,7 +463,7 @@ async def confirm_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Not enough coins now. Try again.")
             return ConversationHandler.END
 
-        # Deduct coins & create request
+        # deduct & create request
         conn.execute(
             "UPDATE users SET coins = coins - ?, upi_method=?, upi_address=? WHERE user_id=?",
             (w["coins"], w["method"], w["upi"], uid),
@@ -496,7 +476,6 @@ async def confirm_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.commit()
 
     await update.message.reply_text("🔄 Your withdrawal request is submitted for admin approval.")
-    # Notify admins
     for admin in ADMIN_IDS:
         try:
             await context.bot.send_message(
@@ -516,7 +495,6 @@ async def confirm_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cancel_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Cancelled.")
     return ConversationHandler.END
-
 
 # -------------------- ADMIN --------------------
 def admin_only(func):
@@ -596,7 +574,6 @@ async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not r:
             await update.message.reply_text("No pending request for that user.")
             return
-        # Refund coins on rejection
         conn.execute("UPDATE users SET coins = coins + ? WHERE user_id=?", (r["coins"], uid))
         conn.execute(
             "UPDATE withdrawals SET status='REJECTED', decided_at=?, admin_id=? WHERE id=?",
@@ -638,7 +615,6 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
     await update.message.reply_text(f"Broadcast sent to {sent} users.")
 
-
 # -------------------- TEXT BUTTON HANDLER --------------------
 async def text_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     txt = (update.message.text or "").strip().lower()
@@ -662,7 +638,6 @@ async def text_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await faq(update, context)
     else:
         await help_cmd(update, context)
-
 
 # -------------------- WIRING --------------------
 def build_app() -> Application:
@@ -709,15 +684,13 @@ def build_app() -> Application:
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_buttons))
     return app
 
-
 def main():
     init_db()
     application = build_app()
     log.info("Bot is running…")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
-
 # -------------------- ENTRYPOINT --------------------
 if __name__ == "__main__":
-    keep_alive()   # Start small Flask server (keeps Render dyno alive, binds PORT)
-    main()         # Start Telegram bot
+    keep_alive()  # keeps Render dyno alive, binds PORT
+    main()
