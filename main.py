@@ -40,9 +40,10 @@ def keep_alive():
 
 
 # -------------------- CONFIG --------------------
-TOKEN = os.getenv("8208891679:AAE6j5aVkxE8SsAJyLnM_Uhy823qFSR7SoE")                     # Set in Render → Environment
+TOKEN = os.getenv("8208891679:AAE6j5aVkxE8SsAJyLnM_Uhy823qFSR7SoE")
 if not TOKEN:
     raise RuntimeError("BOT_TOKEN env var not set!")
+
 
 ADMIN_IDS = [5567349252]                           # Add more if needed
 
