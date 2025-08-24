@@ -1,9 +1,9 @@
 from keep_alive import keep_alive
 
-# Flask server start hoga (Render / Replit ke liye)
+# Flask server start (Render ke liye mandatory)
 keep_alive()
 
-# niche tumhara bot ka original code likho
+# === Telegram bot code niche ===
 from telegram.ext import Application, CommandHandler
 
 TOKEN = "8208891679:AAE6j5aVkxE8SsAJyLnM_Uhy823qFSR7SoE"
